@@ -32,7 +32,12 @@ final class DeformConv2d: NSObject, MLCustomLayer {
             throw ErrorCommon.metalNotSupported
         }
         self.device = device
-        let function = try device.makeFunction(name: "dneprDroid::deform_conv2d")
+        
+        let library = try device.moduleLibrary()
+        guard
+            let function = library.makeFunction(name: "dneprDroid::deform_conv2d")
+        else { throw ErrorCommon.shaderNotFound }
+        
         pipelineState = try device.makeComputePipelineState(function: function)
         super.init()
     }
@@ -93,5 +98,11 @@ final class DeformConv2d: NSObject, MLCustomLayer {
     
     func evaluate(inputs: [MLMultiArray], outputs: [MLMultiArray]) throws {
         throw ErrorCommon.cpuNotImplemented
+    }
+}
+
+extension MTLDevice {
+    func moduleLibrary() throws -> MTLLibrary {
+        return try self.makeDefaultLibrary(bundle: .module)
     }
 }

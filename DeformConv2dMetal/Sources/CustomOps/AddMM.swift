@@ -10,7 +10,11 @@ final class AddMM: NSObject, MLCustomLayer {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw ErrorCommon.metalNotSupported
         }
-        let function = try device.makeFunction(name: "dneprDroid::addmm")
+        let library = try device.moduleLibrary()
+        guard
+            let function = library.makeFunction(name: "dneprDroid::addmm")
+        else { throw ErrorCommon.shaderNotFound }
+
         pipelineState = try device.makeComputePipelineState(function: function)
         
         super.init()

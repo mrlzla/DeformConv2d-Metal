@@ -43,8 +43,8 @@ def torchvision_deform_conv2d(context, node):
     offset = inputs[2]
     mask = inputs[3]
 
-    assert offset.op.op_type == 'const', 'the `offset` param should be stored in the weights'
-    assert mask.op.op_type == 'const', 'the `mask` param should be stored in the weights'
+    #assert offset.op.op_type == 'const', 'the `offset` param should be stored in the weights'
+    #assert mask.op.op_type == 'const', 'the `mask` param should be stored in the weights'
     assert weight.op.op_type == 'const', 'the `weight` param should be stored in the weights'
 
     bias = inputs[4]
@@ -149,6 +149,15 @@ def torchvision_deform_conv2d(context, node):
             weight.shape[2],
             weight.shape[3]
         ])
+    
+    weight = _view(
+        x=weight,
+        shape=[
+            weight.shape[0],
+            weight.shape[1],
+            weight.shape[2] * weight.shape[3] * weight.shape[4]
+        ])
+    
 
     # columns_shape = [
     #       n_in_channels * weight_h * weight_w,
@@ -165,13 +174,30 @@ def torchvision_deform_conv2d(context, node):
 
     # for b in range(batch_sz / n_parallel_imgs):
 
-    weight_g = _view(x=weight, shape=weight.shape[1:])
-    weight_g = _view(x=weight, shape=[1, 1, 1, weight_g.val.size])
+    #weight_g = _view(x=weight, shape=weight.shape[1:])
+    #weight_g = _view(x=weight, shape=[1, 1, 1, weight_g.val.size])
+    
+    offsetShape=_shapeToStr(shape=offset.shape)
+    maskShape=_shapeToStr(shape=mask.shape)
+
+    # offset = _view(
+    #     x=offset,
+    #     shape=[
+    #         offset.shape[0] * offset.shape[1] * offset.shape[2] * offset.shape[3] * offset.shape[4]
+    #     ]
+    # )
+
+    # mask = _view(
+    #     x=mask,
+    #     shape=[
+    #         mask.shape[0] * mask.shape[1] * mask.shape[2] * mask.shape[3] * mask.shape[4]
+    #     ]
+    # )
 
     columns = mb.deform_conv2d_op(
         outShape=columns_shape_str,
-        offsetShape=_shapeToStr(shape=offset.shape),
-        maskShape=_shapeToStr(shape=mask.shape),
+        offsetShape=offsetShape,
+        maskShape=maskShape,
 
         input=input,
 
@@ -223,16 +249,21 @@ def torchvision_deform_conv2d(context, node):
         _state._flatten_index += 1
         return res
 
-    columns_g = _view(x=columns, shape=columns.shape[1:])
+    #columns_g = _view(x=columns, shape=columns.shape[1:])
 
     def _as_img_tensor2(x):
         assert len(x.shape) == 2
         return _view(x=x, shape=([1, 1] + list(x.shape)))
 
-    out_buf_addmm = mb.addmm_op(
-        p1=_as_img_tensor2(_flatten(weight_g, 1)),
-        p2=_as_img_tensor2(columns_g)
+    # out_buf_addmm = mb.addmm_op(
+    #     p1=_as_img_tensor2(_flatten(weight_g, 1)),
+    #     p2=_as_img_tensor2(columns_g)
+    # )
+    out_buf_addmm = mb.matmul(
+        x=weight,
+        y=columns
     )
+    context.add(out_buf_addmm)
     out_buf = _view(x=out_buf_addmm, shape=out_buf.shape)
 
     columns = _view(

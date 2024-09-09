@@ -40,29 +40,22 @@ enum TextureFactory {
         
         let dataBytesPerComponent = data.count / tensorSize
         
-        switch (dataBytesPerComponent, texture.pixelFormat) {
-        case (MemoryLayout<Float32>.stride, .rgba16Float): // float32 -> float16
-            try fill(
-                texture: texture,
-                from: data,
-                shape: shape,
-                channels: 4, // rgba16Float
-                convert: Self.float32to16
-            )
-        case (MemoryLayout<Float32>.stride, .r16Float): // float32 -> float16
-            try fill(
-                texture: texture,
-                from: data,
-                shape: shape,
-                channels: 1,  // r16Float
-                convert: Self.float32to16
-            )
-        default:
+        guard 
+            dataBytesPerComponent == MemoryLayout<Float32>.stride,
+            let channels = texture.pixelFormat.channelsCount
+        else {
             throw ErrorCommon.textureDataConversionNotSupported(
                 bytesPerComponent: dataBytesPerComponent,
                 pixelFormat: texture.pixelFormat
             )
         }
+        try fill(
+            texture: texture,
+            from: data,
+            shape: shape,
+            channels: channels,
+            convert: Self.float32to16
+        )
     }
     
     private static func fill<ScalarSrc: Numeric, ScalarDst: Numeric>(

@@ -23,21 +23,21 @@ class TestModel(nn.Module):
     def __init__(self, sizewh = 16, kwh=3):
         super(TestModel, self).__init__()
 
+        #self.offset = torch.rand(1, 2 * kwh * kwh, sizewh, sizewh)
+        #self.mask = torch.rand(1, kwh * kwh, sizewh, sizewh)
         self.weight = torch.rand(1, 3, kwh, kwh)
-        self.offset = torch.rand(1, 2 * kwh * kwh, sizewh, sizewh)
-        self.mask = torch.rand(1, kwh * kwh, sizewh, sizewh)
 
         print("self.weight: ", self.weight.shape)
-        print("self.offset: ", self.offset.shape)
-        print("self.mask: ", self.mask.shape)
+        #print("self.offset: ", self.offset.shape)
+        #print("self.mask: ", self.mask.shape)
 
-    def forward(self, x):
+    def forward(self, x, offset, mask):
         input = F.interpolate(
             x,
             size=(18, 18),
             mode='bilinear'
         )
-        result = deform_conv2d(input, self.offset, self.weight, mask=self.mask)
+        result = deform_conv2d(input, offset, self.weight, mask=mask)
         return result
 
 def rm(path):
@@ -61,20 +61,27 @@ def save_as_json(tensor, filename, output_dir):
 def convert(output_dir, filename='test-model'):
     output_path = os.path.join(output_dir, filename)
 
-    torch_model = TestModel()
+    sizewh, kwh = 16, 3
+    torch_model = TestModel(sizewh, kwh).eval()
 
     print("generating random input tensor...")
     example_input = torch.rand(1, 3, 600, 600).type(torch.float32)
-    example_output = torch_model(example_input)
+    offset = torch.rand(1, 2 * kwh * kwh, sizewh, sizewh)
+    mask = torch.rand(1, kwh * kwh, sizewh, sizewh)
+    example_output = torch_model(example_input, offset, mask)
 
     print("example output (flatten): ", example_output.flatten())
 
     save_as_json(example_input, 'example_input.json', output_dir)
+    save_as_json(offset, 'example_offset.json', output_dir)
+    save_as_json(mask, 'example_mask.json', output_dir)
     save_as_json(example_output, 'example_output.json', output_dir)
 
-    traced_model = torch.jit.trace(torch_model, example_input)
+    traced_model = torch.jit.trace(torch_model, [example_input, offset, mask])
 
     input_name = "input"
+    offset_name = "dataOffset"
+    mask_name = "dataMask"
     output_name = "output"
 
     mlmodel = coremltools.convert(
@@ -83,6 +90,14 @@ def convert(output_dir, filename='test-model'):
             coremltools.TensorType(
                 name=input_name,
                 shape=(example_input.shape)
+            ),
+            coremltools.TensorType(
+                name=offset_name,
+                shape=(offset.shape)
+            ),
+            coremltools.TensorType(
+                name=mask_name,
+                shape=(mask.shape)
             ),
         ],
         outputs=[
@@ -100,6 +115,13 @@ def convert(output_dir, filename='test-model'):
     rm(mlmodel_path)
     rm(output_path)
     rm(out_pb_path)
+    #print(mlmodel)
+    
+    # coreml_inputs = {"input": example_input.detach().cpu().numpy(),
+    #                  "dataOffset": offset.detach().cpu().numpy(),
+    #                  "dataMask": offset.detach().cpu().numpy()}
+    #prediction_dict = mlmodel.predict(coreml_inputs)
+    #print(prediction_dict["output"])
 
     mlmodel.save(mlmodel_path)
 

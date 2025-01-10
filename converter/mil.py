@@ -86,31 +86,31 @@ def torchvision_deform_conv2d(context, node):
         context.add(res)
         return res
 
-    input = _view(
-        x=input,
-        # shape=[batch_sz / n_parallel_imgs, n_parallel_imgs, n_in_channels, in_h, in_w]
-        shape=[n_parallel_imgs, n_in_channels, in_h, in_w]
-    )
-    offset = _view(
-        x=offset,
-        shape=[
-            batch_sz / n_parallel_imgs,
-            n_parallel_imgs,
-            n_offset_grps * 2 * weight_h * weight_w,
-            out_h,
-            out_w
-        ]
-    )
-    mask = _view(
-        x=mask,
-        shape=[
-            batch_sz / n_parallel_imgs,
-            n_parallel_imgs,
-            n_offset_grps * weight_h * weight_w,
-            out_h,
-            out_w
-        ]
-    )
+    # input = _view(
+    #     x=input,
+    #     # shape=[batch_sz / n_parallel_imgs, n_parallel_imgs, n_in_channels, in_h, in_w]
+    #     shape=[n_parallel_imgs, n_in_channels, in_h, in_w]
+    # )
+    # offset = _view(
+    #     x=offset,
+    #     shape=[
+    #         #batch_sz / n_parallel_imgs,
+    #         n_parallel_imgs,
+    #         n_offset_grps * 2 * weight_h * weight_w,
+    #         out_h,
+    #         out_w
+    #     ]
+    # )
+    # mask = _view(
+    #     x=mask,
+    #     shape=[
+    #         #batch_sz / n_parallel_imgs,
+    #         n_parallel_imgs,
+    #         n_offset_grps * weight_h * weight_w,
+    #         out_h,
+    #         out_w
+    #     ]
+    # )
 
     def _zeros(shape, name):
         return mb.fill(
@@ -157,7 +157,6 @@ def torchvision_deform_conv2d(context, node):
             weight.shape[1],
             weight.shape[2] * weight.shape[3] * weight.shape[4]
         ])
-    
 
     # columns_shape = [
     #       n_in_channels * weight_h * weight_w,
@@ -176,28 +175,11 @@ def torchvision_deform_conv2d(context, node):
 
     #weight_g = _view(x=weight, shape=weight.shape[1:])
     #weight_g = _view(x=weight, shape=[1, 1, 1, weight_g.val.size])
-    
-    offsetShape=_shapeToStr(shape=offset.shape)
-    maskShape=_shapeToStr(shape=mask.shape)
-
-    # offset = _view(
-    #     x=offset,
-    #     shape=[
-    #         offset.shape[0] * offset.shape[1] * offset.shape[2] * offset.shape[3] * offset.shape[4]
-    #     ]
-    # )
-
-    # mask = _view(
-    #     x=mask,
-    #     shape=[
-    #         mask.shape[0] * mask.shape[1] * mask.shape[2] * mask.shape[3] * mask.shape[4]
-    #     ]
-    # )
 
     columns = mb.deform_conv2d_op(
         outShape=columns_shape_str,
-        offsetShape=offsetShape,
-        maskShape=maskShape,
+        offsetShape=_shapeToStr(shape=offset.shape),
+        maskShape=_shapeToStr(shape=mask.shape),
 
         input=input,
 
